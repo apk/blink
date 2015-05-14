@@ -1,5 +1,5 @@
 // Duemilanove w/ ATmega328
-// 
+// Uno
 
 #include <FastLED.h>
 #define NUM_LEDS 3
@@ -34,7 +34,15 @@ struct B {
     r = nr;
     g = ng;
     b = nb;
-    wt = 100;
+    if (wt < 250) wt = 100;
+  }
+
+  void ena (int bitf, int onoff) {
+    if ((onoff & 1) && (bitf & 1)) {
+      wt = 0;
+    } else if ((onoff & 2) && !(bitf & 1)) {
+      wt = 255;
+    }
   }
 
   int nxt(int i, int c) {
@@ -46,6 +54,7 @@ struct B {
   }
 
   void stpx(int lim) {
+    if (wt > 250) return;
     if (wt > 0) {
       wt --;
       return;
@@ -94,6 +103,13 @@ void loop() {
   }
 }
 
+void ena (int bits, int onoff) {
+  q.ena (bits >> 3, onoff);
+  b3.ena (bits >> 2, onoff);
+  b2.ena (bits >> 1, onoff);
+  b1.ena (bits >> 0, onoff);
+}
+
 int rp = 0;
 int rq = 25;
 int ra = 0;
@@ -137,6 +153,12 @@ void serialEvent () {
       b2.set (rq, ra, rb, rc);
     } else if (v == 'k') {
       b3.set (rq, ra, rb, rc);
+    } else if (v == 'E') {
+      ena (rc, 1);
+    } else if (v == 'D') {
+      ena (~rc, 2);
+    } else if (v == 'F') {
+      ena (rc, 3);
     } else {
       Serial.write('A'+((v >> 4) & 15));
       Serial.write('A'+(v & 15));
