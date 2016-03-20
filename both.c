@@ -2,7 +2,7 @@
 // Uno
 
 #include <FastLED.h>
-#define NUM_LEDS 3
+#define NUM_LEDS 7
 #define DATA_PIN 6
 
 CRGB leds[NUM_LEDS];
@@ -14,9 +14,43 @@ void setup() {
 
 #define LIM 251
 
+struct SV {
+  int val, dv, st, ac;
+  void operator= (int x) { val = x; }
+  void nxt(int c, int lm) {
+    if (c & 1) {
+      val = val < lm ? val + 1 : lm;
+    } else {
+      val = val > 0 ? val - 1 : 0;
+    }
+  }
+  void set (int nv, int dl) {
+    if (dl > 0) {
+      dv = nv - val;
+      st = dl;
+      ac = st / 2;
+    } else {
+      val = nv;
+    }
+  }
+  void ds () {
+    if (dv >= 0) {
+      ac += dv;
+      val += (ac / st);
+      ac %= st;
+    } else {
+      ac -= dv;
+      val -= (ac / st);
+      ac %= st;
+    }
+  }
+  operator int() { return val; }
+};
+
 struct B {
 
-  int r, g, b, t, i, lm, wt;
+  int t, i, lm, wt, dl;
+  SV r, g, b;
 
   B (int l = LIM) {
      lm = l;
@@ -28,12 +62,14 @@ struct B {
      t = 0;
      i = 0;
      wt = 0;
+     dl = 0;
   }
 
-  void set (int dl, int nr, int ng, int nb) {
-    r = nr;
-    g = ng;
-    b = nb;
+  void set (int d, int nr, int ng, int nb) {
+    r.set (nr, d);
+    g.set (ng, d);
+    b.set (nb, d);
+    dl = d;
     if (wt < 250) wt = 100;
   }
 
@@ -45,15 +81,14 @@ struct B {
     }
   }
 
-  int nxt(int i, int c) {
-    if (c & 1) {
-      return i < lm ? i + 1 : lm;
-    } else {
-      return i > 0 ? i - 1 : 0;
-    }
-  }
-
   void stpx(int lim) {
+    if (dl > 0) {
+        dl --;
+        r.ds ();
+        g.ds ();
+        b.ds ();
+        return;
+    }
     if (wt > 250) return;
     if (wt > 0) {
       wt --;
@@ -64,9 +99,9 @@ struct B {
       t = random(7)+0;
     }
     i --;
-    r=nxt(r,t);
-    g=nxt(g,t>>1);
-    b=nxt(b,t>>2);
+    r.nxt(t, lm);
+    g.nxt(t>>1, lm);
+    b.nxt(t>>2, lm);
   }
 
   void stp(int lim, CRGB &rgb) {
@@ -75,7 +110,7 @@ struct B {
   }
 };
 
-B b1, b2, b3, q (250);
+B b[NUM_LEDS], q (250);
 
 int wd = 0;
 int wv = 0;
@@ -84,14 +119,14 @@ void loop() {
 //  for(int i = 0; i < 100; i ++) {
     
   //  leds[2] = CRGB::CRGB(i,100,0); 
-    b1.stp(LIM,leds[0]);
-    b2.stp(LIM+3,leds[1]);
-    b3.stp(LIM+5,leds[2]);
-    q.stpx(164);
-    FastLED.show();
-    analogWrite(9, q.r);
-    analogWrite(10, q.g);
-    analogWrite(11, q.b);
+  for (int i = 0; i < 7; i ++) {
+    b[i].stp(LIM-i,leds[i]);
+  }
+  q.stpx(164);
+  FastLED.show();
+  analogWrite(9, q.r);
+  analogWrite(10, q.g);
+  analogWrite(11, q.b);
     //delay(30);
  // }
   delay(40);
@@ -104,10 +139,10 @@ void loop() {
 }
 
 void ena (int bits, int onoff) {
-  q.ena (bits >> 3, onoff);
-  b3.ena (bits >> 2, onoff);
-  b2.ena (bits >> 1, onoff);
-  b1.ena (bits >> 0, onoff);
+  q.ena (bits >> 7, onoff);
+  for (int i = 0; i < 7; i++) {
+    b[i].ena (bits >> i, onoff);
+  }
 }
 
 int rp = 0;
@@ -148,11 +183,19 @@ void serialEvent () {
     } else if (v == '.') {
       q.set (rq, ra, rb, rc);
     } else if (v == 'i') {
-      b1.set (rq, ra, rb, rc);
+      b[0].set (rq, ra, rb, rc);
     } else if (v == 'j') {
-      b2.set (rq, ra, rb, rc);
+      b[1].set (rq, ra, rb, rc);
     } else if (v == 'k') {
-      b3.set (rq, ra, rb, rc);
+      b[2].set (rq, ra, rb, rc);
+    } else if (v == 'l') {
+      b[3].set (rq, ra, rb, rc);
+    } else if (v == 'n') {
+      b[4].set (rq, ra, rb, rc);
+    } else if (v == 'o') {
+      b[5].set (rq, ra, rb, rc);
+    } else if (v == 'p') {
+      b[6].set (rq, ra, rb, rc);
     } else if (v == 'E') {
       ena (rc, 1);
     } else if (v == 'D') {
